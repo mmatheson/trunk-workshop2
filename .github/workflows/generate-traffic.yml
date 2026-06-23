@@ -1,0 +1,38 @@
+name: Generate Traffic
+# Keeps the Merge Queue moving and flake history accumulating in the "Final
+# state" repo. Ships DISABLED: every run is gated on the TRAFFIC_ENABLED repo
+# variable (Settings → Secrets and variables → Actions → Variables), so it
+# does nothing until a human flips it to 'true'.
+#
+# COST NOTE: each run opens PRs that each trigger the Unit + E2E workflows.
+# That burns CI minutes — keep the cadence modest and edit the cron below to
+# taste.
+on:
+  schedule:
+    - cron: "0 */6 * * *" # every 6 hours
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  traffic:
+    name: Generate Traffic
+    if: vars.TRAFFIC_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Open queued PRs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run open-prs -- --count 3 --queue
