@@ -8,9 +8,10 @@ export default defineConfig({
   // Emit JUnit XML for Trunk to ingest, alongside the list reporter.
   reporter: [["list"], ["junit", { outputFile: "test-results/e2e-junit.xml" }]],
   use: { baseURL: "http://localhost:3000" },
-  // Tests run against the production server, so `npm run build` must run first.
+  // Run against the dev server — it boots in seconds, so there's no separate
+  // `next build` step (keeps the CI job fast: the queue's long-pole check ≤30s).
   webServer: {
-    command: "npm run start",
+    command: "npm run dev",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
   },

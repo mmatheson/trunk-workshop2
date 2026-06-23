@@ -19,8 +19,15 @@ jobs:
           node-version: 22.16.0 # keep in sync with .trunk/trunk.yaml
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps
-      - run: npm run build
+      # Cache the browser so warm runs skip the download; no --with-deps (apt is
+      # slow and ubuntu-latest already ships chromium's libs), no build step
+      # (Playwright boots `next dev`). Keeps the long-pole check fast for the queue.
+      - name: Cache Playwright browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npx playwright install chromium
       # Clear stale JUnit so a reused runner can't re-upload old results.
       - run: rm -rf test-results && mkdir -p test-results
       - name: Run e2e tests

@@ -53,9 +53,8 @@ npm install   # node/npm are Trunk-managed once direnv is set up (above)
 npm run test:unit
 
 # E2E (Playwright) → writes test-results/e2e-junit.xml
-npx playwright install --with-deps   # first time only
-npm run build                        # e2e runs against the production server
-npm run test:e2e
+npx playwright install chromium   # first time only
+npm run test:e2e                  # boots `next dev` automatically
 ```
 
 JUnit reports land in `test-results/`. The CI workflows clear that directory before each run so a
