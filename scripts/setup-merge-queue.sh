@@ -32,23 +32,26 @@ echo "Configuring Trunk Merge Queue branch protection for: ${REPO}"
 echo "→ Enabling squash merges…"
 gh api "repos/${REPO}" -X PATCH -F allow_squash_merge=true >/dev/null
 
-# --- 2. Discover the trunk-io GitHub App id ---------------------------------
-# Needed as the bypass actor in ruleset #1. Only resolvable once the App is installed.
+# --- 2. Resolve the Trunk GitHub App id -------------------------------------
+# The bypass actor in ruleset #1 is the trunk-io app's integration id. Look it up by
+# slug via /apps/{slug} — this works with a normal gh token. (/user/installations
+# does NOT: it needs a GitHub-App user-to-server token and returns 403 otherwise.)
+TRUNK_APP_SLUG="${TRUNK_APP_SLUG:-trunk-io}"
 if [[ -z "${TRUNK_APP_ID:-}" ]]; then
-  echo "→ Discovering the trunk-io GitHub App id…"
-  TRUNK_APP_ID="$(gh api /user/installations \
-    --jq '.installations[] | select(.app_slug=="trunk-io") | .app_id' 2>/dev/null | head -n1 || true)"
+  echo "→ Resolving the ${TRUNK_APP_SLUG} GitHub App id…"
+  TRUNK_APP_ID="$(gh api "/apps/${TRUNK_APP_SLUG}" --jq '.id' 2>/dev/null || true)"
 fi
-if [[ -z "${TRUNK_APP_ID:-}" ]]; then
+# Validate before use: a failed lookup must never get injected into the ruleset body.
+if ! [[ "${TRUNK_APP_ID:-}" =~ ^[0-9]+$ ]]; then
   cat >&2 <<EOF
-ERROR: could not find the 'trunk-io' GitHub App among your installations.
+ERROR: could not resolve the '${TRUNK_APP_SLUG}' GitHub App id (got: '${TRUNK_APP_ID:-}').
   Make sure the Trunk GitHub App is installed on ${REPO}, then re-run — or pass the
   id explicitly:  TRUNK_APP_ID=<id> $0 ${REPO}
-  List candidates with:  gh api /user/installations --jq '.installations[] | {app_slug, app_id}'
+  Find it with:  gh api /apps/${TRUNK_APP_SLUG} --jq .id
 EOF
   exit 1
 fi
-echo "  trunk-io app id: ${TRUNK_APP_ID}"
+echo "  ${TRUNK_APP_SLUG} app id: ${TRUNK_APP_ID}"
 
 # --- helper: create-or-update a ruleset by name -----------------------------
 upsert_ruleset() {
