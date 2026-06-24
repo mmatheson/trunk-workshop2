@@ -114,6 +114,28 @@ earlier ones, and one ordering gotcha will bite you otherwise (see the callout).
     there's real queue depth and flake history to cut to. Flip it back to `false` (or unset it) to
     stop the traffic.
 
+    For the traffic workflow to actually open **mergeable** PRs, two more things are needed:
+
+    - **A `TRAFFIC_PAT` secret.** PRs opened with the built-in `GITHUB_TOKEN` don't trigger other
+      workflows (GitHub blocks recursion), so they'd never run the required Unit/E2E checks and would
+      stall in the queue. Create a PAT (classic: `repo` scope; or fine-grained: Contents + Pull
+      requests read/write on the repo) and add it so the workflow pushes/creates PRs as a real user:
+      ```bash
+      gh secret set TRAFFIC_PAT --repo <you>/trunk-workshop --body "<your-pat>"
+      ```
+    - **Allow Actions to create PRs** (only needed for the `GITHUB_TOKEN` fallback, harmless to set):
+      Settings → Actions → General → Workflow permissions → check *Allow GitHub Actions to create and
+      approve pull requests*, or:
+      ```bash
+      gh api -X PUT repos/<you>/trunk-workshop/actions/permissions/workflow \
+        -f default_workflow_permissions=read -F can_approve_pull_request_reviews=true
+      ```
+
+    > Note: scheduled workflows are **disabled by default on forks** and auto-disable after 60 days
+    > idle. Enable via the Actions tab (or `gh workflow enable generate-traffic.yml`); the traffic it
+    > generates keeps the repo active. GitHub crons are also best-effort (often delayed), so for
+    > on-demand traffic use `gh workflow run generate-traffic.yml` or run `open-prs` in a local loop.
+
 ## Resetting a fork to a clean slate
 
 To start over (e.g. to re-record from scratch), the **order matters**: the rulesets block the sync

@@ -2,7 +2,8 @@ name: Generate Traffic
 # Keeps the Merge Queue moving and flake history accumulating in the "Final
 # state" repo. Ships DISABLED: every run is gated on the TRAFFIC_ENABLED repo
 # variable (Settings → Secrets and variables → Actions → Variables), so it
-# does nothing until a human flips it to 'true'.
+# does nothing until a human flips it to 'true'. For the opened PRs to run CI
+# (and so flow through the queue), set a PAT secret named TRAFFIC_PAT — see SETUP.md.
 #
 # COST NOTE: each run opens PRs that each trigger the Unit + E2E workflows.
 # That burns CI minutes — keep the cadence modest and edit the cron below to
@@ -23,6 +24,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # Push branches as the PAT (if set) so the resulting PRs trigger CI.
+          # The built-in GITHUB_TOKEN can't trigger other workflows, so its PRs
+          # would never run the required checks and the queue couldn't merge them.
+          token: ${{ secrets.TRAFFIC_PAT || secrets.GITHUB_TOKEN }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22.16.0 # keep in sync with .trunk/trunk.yaml
@@ -33,6 +38,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
       - name: Open queued PRs
+        # Prefer a PAT (secret TRAFFIC_PAT) so the PRs it opens trigger CI and can
+        # flow through the queue. Falls back to GITHUB_TOKEN, which (with the repo's
+        # "Allow GitHub Actions to create and approve pull requests" setting on) can
+        # still CREATE PRs — but they won't run CI, so they'll stall in the queue.
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.TRAFFIC_PAT || secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.TRAFFIC_PAT || secrets.GITHUB_TOKEN }}
         run: npm run open-prs -- --count 3 --queue
